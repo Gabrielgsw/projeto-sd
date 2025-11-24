@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Weather & News App</title>
+
+<style>
+    body {
+        margin: 0;
+        font-family: "Segoe UI", sans-serif;
+        background: #f2f6ff;
+        color: #333;
+    }
+
+    /* NAV SUPERIOR */
+    header {
+        background: #4a90e2;
+        padding: 15px 25px;
+        color: #fff;
+        font-size: 22px;
+        font-weight: bold;
+    }
+
+    /* MENU DE TABS */
+    nav {
+        display: flex;
+        background: #ffffff;
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+        justify-content: space-around;
+    }
+
+    nav button {
+        background: #e7efff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-size: 15px;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    nav button:hover, nav button.active {
+        background: #4a90e2;
+        color: white;
+    }
+
+    /* CONTAINER */
+    .page {
+        display: none;
+        padding: 25px;
+        animation: fade 0.3s ease;
+    }
+    .active-page {
+        display: block;
+    }
+
+    @keyframes fade {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    /* CARDS */
+    .card {
+        background: white;
+        padding: 20px;
+        border-radius: 16px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        margin-bottom: 20px;
+    }
+
+    .card h2 {
+        margin: 0 0 10px 0;
+        color: #4a90e2;
+        font-size: 22px;
+    }
+
+    .weather-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+    }
+
+    /* LISTAS */
+    .list-item {
+        background: #eef3ff;
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 10px;
+    }
+
+    .list-item:hover {
+        background: #dfe8ff;
+    }
+
+    /* PERFIL */
+    label {
+        display: block;
+        margin-top: 15px;
+        font-weight: bold;
+    }
+
+    input {
+        padding: 10px;
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid #ccc;
+        margin-top: 5px;
+    }
+
+    button.save {
+        margin-top: 20px;
+        background: #4a90e2;
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 20px;
+        cursor: pointer;
+    }
+
+</style>
+</head>
+
+<body>
+
+<header>Weather & News Dashboard</header>
+
+<nav>
+    <button class="active" onclick="showPage('dashboard')">Dashboard</button>
+    <button onclick="showPage('weather')">Clima</button>
+    <button onclick="showPage('news')">Notícias</button>
+    <button onclick="showPage('alerts')">Alertas</button>
+    <button onclick="showPage('profile')">Perfil</button>
+</nav>
+
+<!-- ================================
+        DASHBOARD
+=================================== -->
+<div id="dashboard" class="page active-page">
+    <div class="card">
+        <h2>Resumo do Clima</h2>
+        <p>Temperatura atual: <b>27°C</b></p>
+        <p>Condição: Ensolarado</p>
+    </div>
+
+    <div class="card">
+        <h2>Últimas Notícias</h2>
+        <div class="list-item">💬 Onda de calor atinge região Sul do país.</div>
+        <div class="list-item">💬 Chuvas fortes previstas para esta semana.</div>
+    </div>
+
+    <div class="card">
+        <h2>Alertas Recentes</h2>
+        <div class="list-item">⚠️ Alerta de calor extremo - risco moderado.</div>
+    </div>
+</div>
+
+
+<!-- ================================
+        CLIMA
+=================================== -->
+<div id="weather" class="page">
+    <div class="card">
+        <h2>Clima Atual</h2>
+        <p><b>27°C</b> - Ensolarado</p>
+        <p>Umidade: 58%</p>
+        <p>Vento: 12 km/h</p>
+    </div>
+
+    <div class="card">
+        <h2>Previsão</h2>
+
+        <div class="weather-grid">
+            <div class="list-item">🌤️ Hoje — 27°C</div>
+            <div class="list-item">☀️ Amanhã — 30°C</div>
+            <div class="list-item">⛅ Quarta — 29°C</div>
+            <div class="list-item">🌧️ Quinta — 23°C</div>
+            <div class="list-item">⛈️ Sexta — 21°C</div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ================================
+        NOTÍCIAS
+=================================== -->
+<div id="news" class="page">
+    <div class="card">
+        <h2>Notícias Climáticas</h2>
+
+        <div class="list-item">📰 “Temperaturas globais subiram 1.2°C em 2024”</div>
+        <div class="list-item">📰 “Regiões costeiras enfrentam risco de enchentes”</div>
+        <div class="list-item">📰 “Nova frente fria chega ao Sudeste”</div>
+        <div class="list-item">📰 “Seca prolongada ameaça lavouras no Centro-Oeste”</div>
+    </div>
+</div>
+
+
+<!-- ================================
+        ALERTAS
+=================================== -->
+<div id="alerts" class="page">
+    <div class="card">
+        <h2>Alertas do Sistema</h2>
+
+        <div class="list-item">⚠️ Alerta de calor extremo – Índice UV alto</div>
+        <div class="list-item">⚠️ Risco de tempestade nas próximas 24h</div>
+        <div class="list-item">⚠️ Nível de água elevado em áreas costeiras</div>
+    </div>
+</div>
+
+
+<!-- ================================
+        PERFIL
+=================================== -->
+<div id="profile" class="page">
+    <div class="card">
+        <h2>Perfil do Usuário</h2>
+
+        <label>Nome</label>
+        <input type="text" value="João Silva">
+
+        <label>Cidade</label>
+        <input type="text" value="Curitiba">
+
+        <label>País</label>
+        <input type="text" value="Brasil">
+
+        <label>Unidade de Temperatura</label>
+        <input type="text" value="°C">
+
+        <button class="save">Salvar</button>
+    </div>
+</div>
+
+<script>
+function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active-page'));
+    document.getElementById(id).classList.add('active-page');
+
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>
