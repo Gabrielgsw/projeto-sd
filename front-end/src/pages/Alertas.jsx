@@ -1,27 +1,56 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import BarraLateral from '../components/BarraLateral';
 
 function Alertas() {
-  const navigate = useNavigate();
+
+  const [alertas, setAlertas] = useState([
+    {
+      id: 1,
+      mensagem: 'Alerta de calor extremo — índice UV alto',
+      tipo: 'calor'
+    },
+    {
+      id: 2,
+      mensagem: 'Risco de tempestade nas próximas 24h',
+      tipo: 'tempestade'
+    },
+    {
+      id: 3,
+      mensagem: 'Nível de água elevado em áreas costeiras',
+      tipo: 'enchente'
+    }
+  ]);
 
   return (
-    <div className="h-screen text-gray-800 flex flex-col min-w-[1024px]">
-      <div className="flex flex-1 overflow-hidden">
-        <BarraLateral />
+    <div className="h-screen text-gray-800 flex min-w-[1024px]">
+      <BarraLateral />
 
-        {/* Área central */}
-        <main className="flex-1 overflow-y-auto p-8 bg-white">
-          <h1 className="text-4xl font-bold mb-6">Alertas</h1>
+      <main className="flex-1 overflow-y-auto p-8 bg-gray-50">
+        <h1 className="text-4xl font-bold mb-10">Alertas</h1>
 
-          {/* Alertas*/}
-          <section className="mb-16">
-            <h2 className="text-lg font-semibold mb-8 flex items-center gap-2">
+        {/* Alertas do Sistema */}
+        <section>
+          <div className="bg-white rounded-xl shadow p-6">
+            <h2 className="text-xl font-semibold text-blue-500 mb-6">
               Alertas do Sistema
             </h2>
-          </section>
-        </main>
-      </div>
+
+            <div className="space-y-4">
+              {alertas.map(alerta => (
+                <div
+                  key={alerta.id}
+                  className="bg-blue-50 rounded-lg px-4 py-3 flex items-center gap-3"
+                >
+                  ⚠️
+                  <span className="text-gray-700">
+                    {alerta.mensagem}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }

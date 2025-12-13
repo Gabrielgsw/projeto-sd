@@ -119,7 +119,7 @@ function Login() {
               Entrar
             </button>
 
-            <p className="mt-6 text-gray-700 mb-8 text-center">
+            <p className="mt-6 text-gray-700 mb-8">
               Não tem uma conta?{' '}
               <a href="/cadastro" className="text-[#1A225F] md:text-main font-bold hover:underline">
                 Cadastre-se

@@ -57,7 +57,7 @@ function Perfil() {
                 <input
                   name="username"
                   type="text"
-                  placeholder={userData?.username || "Seu nome"}
+                  placeholder={userData?.username || "Digite um novo nome"}
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 shadow-sm focus:ring-2 focus:ring-blue-700 outline-none"
