@@ -1,0 +1,146 @@
+version: "3.8"
+
+services:
+  # --- Banco de Dados ---
+  main-db:
+    image: postgres:15
+    container_name: main-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: userdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - main-db-data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api-gateway:
+    build: ./src/api-gateway
+    container_name: api-gateway
+    depends_on:
+      - weather-service
+      - news-service
+      - user-service
+    ports:
+      - "4000:4000" # Esta será a única porta que o seu Front vai chamar!
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"   # Porta de comunicação
+      - "15672:15672" # Painel administrativo (login: guest/guest)
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Redis ---
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- Weather Service ---
+  weather-service:
+    build:
+      context: ./src/WeatherService
+      dockerfile: Dockerfile
+    container_name: weather-service
+    depends_on:
+      main-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - PORT=3001
+      # Conecta no weatherdb (assumindo que seu script init-db criou ele)
+      - DATABASE_URL=postgresql://postgres:123@main-db:5432/userdb?schema=public
+      - REDIS_URL=redis://redis:6379
+      - OPENWEATHER_API_KEY=${API_KEY_WEATHER}
+    ports:
+      - "3001:3001"
+
+  # --- News Service ---
+  news-service:
+    build: ./src/NewsService
+    container_name: news-service
+    depends_on:
+      main-db: # <--- CORRIGIDO: Nome correto do serviço
+        condition: service_healthy
+      alert-service:
+        condition: service_started
+    environment:
+      - PORT=3002
+      # <--- CORRIGIDO: Usuário postgres, senha 123, host main-db, banco userdb
+      - DATABASE_URL=postgresql://postgres:123@main-db:5432/userdb?schema=public
+      - NEWS_API_KEY=${NEWS_API_KEY}
+      - ALERT_SERVICE_URL=http://alert-service:3004
+    ports:
+      - "3002:3002"
+
+  alert-service:
+    build: ./src/AlertService
+    container_name: alert-service
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - PORT=3004
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    ports:
+      - "3004:3004"
+
+  notification-service:
+    build: ./src/NotificationService
+    container_name: notification-service
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      main-db:
+        condition: service_healthy
+    environment:
+      - PORT=3005  
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - DATABASE_URL=postgresql://postgres:123@main-db:5432/userdb?schema=public
+    ports:
+      - "3005:3005"
+
+  # --- User Service ---
+  user-service:
+    build: ./src/UserService
+    container_name: user-service
+    depends_on:
+      main-db: # <--- CORRIGIDO: Nome correto do serviço
+        condition: service_healthy
+    environment:
+      - PORT=3003
+      # <--- CORRIGIDO: Usuário postgres, senha 123, host main-db, banco userdb
+      - DATABASE_URL=postgresql://postgres:123@main-db:5432/userdb?schema=public
+      - JWT_SECRET=${JWT_SECRET}
+    ports:
+      - "3003:3003"
+
+volumes:
+  main-db-data:
+  redis-data:
+  rabbitmq-data:

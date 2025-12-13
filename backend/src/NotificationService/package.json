@@ -1,17 +1,21 @@
 {
   "name": "notificationservice",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@prisma/client": "^7.0.1",
-    "express": "^5.2.1",
-    "prisma": "^7.0.1"
+    "@prisma/client": "5.22.0",
+    "amqplib": "^0.10.5", 
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "prisma": "5.22.0"
   }
 }

@@ -1,101 +1,157 @@
 import express from "express";
 import axios from "axios";
-import { weatherStore } from "./weatherData.js";
+import dotenv from "dotenv";
+import { PrismaClient } from "@prisma/client";
+import { createClient } from "redis";
+
+dotenv.config();
 
 const app = express();
 app.use(express.json());
 
-const API_KEY = "a650ec49e0e1970ee74f8f0898ec99a4";
+const prisma = new PrismaClient();
+const redis = createClient({
+  url: process.env.REDIS_URL || 'redis://redis:6379'
+});
+
+await redis.connect();
+
+const API_KEY = process.env.OPENWEATHER_API_KEY;
 
 // ------------------------------
 // 1) Clima atual
 // ------------------------------
 app.get("/weather/current/:city", async (req, res) => {
-  const { city } = req.params;
+  try {
+    const { city } = req.params;
+    const cacheKey = `weather:current:${city}`;
 
-  // já existe em memória?
-  if (weatherStore.current[city]) {
-    return res.json({ source: "memory", data: weatherStore.current[city] });
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.json({ source: "cache", data: JSON.parse(cached) });
+    }
+
+    const response = await axios.get(
+      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
+    );
+
+    const data = {
+      temp: response.data.main.temp,
+      condition: response.data.weather[0].description,
+    };
+
+    await redis.setEx(cacheKey, 600, JSON.stringify(data));
+
+    await prisma.weather.create({
+      data: {
+        city,
+        temp: data.temp,
+        condition: data.condition
+      },
+    });
+
+    return res.json({ source: "api", data });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
-
-  // buscar na OpenWeather
-  const response = await axios.get(
-    `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
-  );
-
-  const data = {
-    temp: response.data.main.temp,
-    condition: response.data.weather[0].description,
-  };
-
-  weatherStore.current[city] = data;
-
-  return res.json({ source: "api", data });
 });
 
 // ------------------------------
 // 2) Umidade
 // ------------------------------
 app.get("/weather/humidity/:city", async (req, res) => {
-  const { city } = req.params;
+  try {
+    const { city } = req.params;
+    const cacheKey = `weather:humidity:${city}`;
 
-  if (weatherStore.humidity[city]) {
-    return res.json({ source: "memory", data: weatherStore.humidity[city] });
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.json({ source: "cache", data: JSON.parse(cached) });
+    }
+
+    const response = await axios.get(
+      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
+    );
+
+    const data = { humidity: response.data.main.humidity };
+
+    await redis.setEx(cacheKey, 600, JSON.stringify(data));
+
+    await prisma.weather.create({
+      data: {
+        city,
+        humidity: data.humidity
+      },
+    });
+
+    return res.json({ source: "api", data });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
-
-  const response = await axios.get(
-    `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
-  );
-
-  const data = { humidity: response.data.main.humidity };
-
-  weatherStore.humidity[city] = data;
-
-  return res.json({ source: "api", data });
 });
 
 // ------------------------------
 // 3) Vento
 // ------------------------------
 app.get("/weather/wind/:city", async (req, res) => {
-  const { city } = req.params;
+  try {
+    const { city } = req.params;
+    const cacheKey = `weather:wind:${city}`;
 
-  if (weatherStore.wind[city]) {
-    return res.json({ source: "memory", data: weatherStore.wind[city] });
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.json({ source: "cache", data: JSON.parse(cached) });
+    }
+
+    const response = await axios.get(
+      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
+    );
+
+    const data = { speed: response.data.wind.speed };
+
+    await redis.setEx(cacheKey, 600, JSON.stringify(data));
+
+    await prisma.weather.create({
+      data: {
+        city,
+        wind: data.speed
+      },
+    });
+
+    return res.json({ source: "api", data });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
-
-  const response = await axios.get(
-    `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
-  );
-
-  const data = { speed: response.data.wind.speed };
-
-  weatherStore.wind[city] = data;
-
-  return res.json({ source: "api", data });
 });
 
 // ------------------------------
 // 4) Previsão
 // ------------------------------
 app.get("/weather/forecast/:city", async (req, res) => {
-  const { city } = req.params;
+  try {
+    const { city } = req.params;
+    const cacheKey = `weather:forecast:${city}`;
 
-  if (weatherStore.forecast[city]) {
-    return res.json({ source: "memory", data: weatherStore.forecast[city] });
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.json({ source: "cache", data: JSON.parse(cached) });
+    }
+
+    const response = await axios.get(
+      `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=metric`
+    );
+
+    const data = response.data.list.slice(0, 5);
+
+    await redis.setEx(cacheKey, 600, JSON.stringify(data));
+
+    return res.json({ source: "api", data });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
-
-  const response = await axios.get(
-    `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=metric`
-  );
-
-  const data = response.data.list.slice(0, 5);
-
-  weatherStore.forecast[city] = data;
-
-  return res.json({ source: "api", data });
 });
 
-app.listen(3001, () => {
-  console.log("Weather Service rodando na porta 3001 🚀");
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Weather Service rodando na porta ${PORT} 🚀`);
 });

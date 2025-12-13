@@ -1,0 +1,4 @@
+CREATE DATABASE weatherdb;
+CREATE DATABASE newsdb;
+CREATE DATABASE alertdb;
+CREATE DATABASE notificationdb;

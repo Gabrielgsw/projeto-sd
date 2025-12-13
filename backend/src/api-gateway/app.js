@@ -1,58 +1,62 @@
-import express from "express";
-import axios from "axios";
+const express = require('express');
+const { createProxyMiddleware } = require('http-proxy-middleware');
+const cors = require('cors');
+require('dotenv').config();
 
 const app = express();
-app.use(express.json());
+const PORT = process.env.PORT || 4000;
 
-const WEATHER_SERVICE_URL = "http://localhost:3001";
+// Configuração do CORS (O Gateway gerencia quem pode entrar)
+app.use(cors());
 
-// clima atual
-app.get("/api/weather/current/:city", async (req, res) => {
-  const { city } = req.params;
-
-  try {
-    const response = await axios.get(
-      `${WEATHER_SERVICE_URL}/weather/current/${city}`
-    );
-
-    res.json(response.data);
-  } catch (err) {
-    console.error("Erro ao chamar Weather Service:", err.message);
-    res.status(500).json({ error: "Weather Service indisponível" });
-  }
+// Rota de teste
+app.get('/', (req, res) => {
+  res.send('API Gateway is running!');
 });
 
-// umidade atual
-app.get("/api/weather/humidity/:city", async (req, res) => {
-  const { city } = req.params;
+// --- ROTAS DE PROXY ---
 
-  try {
-    const response = await axios.get(
-      `${WEATHER_SERVICE_URL}/weather/humidity/${city}`
-    );
-    res.json(response.data);
-    } catch (err) {
-    console.error("Erro ao chamar Weather Service:", err.message);
-    res.status(500).json({ error: "Weather Service indisponível" });
-  }
-});
+// 1. Se o Front pedir /weather -> Redireciona para o container weather-service:3001
+app.use('/weather', createProxyMiddleware({
+  target: process.env.WEATHER_SERVICE_URL || 'http://weather-service:3001',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/weather': '', // Remove o /weather da URL antes de mandar para o serviço
+  },
+}));
 
-//previsão
+// 2. Se pedir /news -> Redireciona para news-service:3002
+// Nota: Removemos o pathRewrite aqui SE as rotas do seu serviço já esperarem /news
+// Mas como no seu news-service a rota é /news/:city, se mandarmos /news/Recife,
+// e o serviço espera /news/Recife, NÃO devemos remover o prefixo.
+// Porém, se no serviço a rota fosse apenas /:city, teríamos que remover.
+// Pelo seu código anterior: app.get('/news/:city'...) -> Então o serviço ESPERA receber /news.
+app.use('/news', createProxyMiddleware({
+  target: process.env.NEWS_SERVICE_URL || 'http://news-service:3002',
+  changeOrigin: true,
+  // Não usamos pathRewrite aqui porque seu serviço já tem rotas começando com /news
+}));
 
-app.get("/api/weather/forecast/:city", async (req, res) => {
-  const { city } = req.params;
+// 3. Se pedir /users -> Redireciona para user-service:3003
+app.use('/users', createProxyMiddleware({
+  target: process.env.USER_SERVICE_URL || 'http://user-service:3003',
+  changeOrigin: true,
+}));
 
-  try {
-    const response = await axios.get(
-      `${WEATHER_SERVICE_URL}/weather/forecast/${city}`
-    );
-    res.json(response.data);
-    } catch (err) {
-    console.error("Erro ao chamar Weather Service:", err.message);
-    res.status(500).json({ error: "Weather Service indisponível" });
-  }
-});
+app.use('/notifications', createProxyMiddleware({
+  target: process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:3005',
+  changeOrigin: true,
+  // Se a rota no serviço é /notifications/:userId, e aqui chamamos /notifications,
+  // precisamos remover o prefixo SE o serviço esperasse apenas /:userId.
+  // Mas como definimos app.get('/notifications/:userId'), NÃO precisa de rewrite.
+}));
 
-app.listen(3000, () => {
-  console.log("API Gateway rodando na porta 3000");
+// 4. (Opcional) Se quiser expor o AlertService para testes (geralmente é interno)
+app.use('/alerts', createProxyMiddleware({
+  target: process.env.ALERT_SERVICE_URL || 'http://alert-service:3004',
+  changeOrigin: true,
+}));
+
+app.listen(PORT, () => {
+  console.log(`API Gateway rodando na porta ${PORT}`);
 });
