@@ -13,54 +13,47 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_dev';
 app.use(cors());
 app.use(express.json());
 
-// Rota de teste
+// test
 app.get('/', (req, res) => {
   res.send('UserService is running on port ' + PORT);
 });
 
-// =========================================================
-// ROTA DE REGISTRO (Cria usuário + Criptografa Senha)
-// =========================================================
-app.post('/auth/register', async (req, res) => {
-  const { name, email, password, city } = req.body;
+
+app.post('/register', async (req, res) => {
+  const { email, password, name } = req.body;
 
   // Validação básica
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: "Todos os campos (name, email, password) são obrigatórios." });
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email e senha são obrigatórios." });
   }
 
   try {
-    // 1. Verifica se usuário já existe
-    const userExists = await prisma.user.findUnique({
+    
+    const existingUser = await prisma.user.findUnique({
       where: { email: email }
     });
 
-    if (userExists) {
-      return res.status(400).json({ error: "E-mail já cadastrado." });
+    if (existingUser) {
+        return res.status(400).json({ email: ["Este e-mail já está cadastrado."] });
     }
 
-    // 2. Criptografa a senha (Hash)
-    // O '10' é o custo do processamento (Salt rounds). Quanto maior, mais seguro e mais lento.
+    
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-
-    // 3. Cria o usuário no banco
+    
     const newUser = await prisma.user.create({
       data: {
         name,
         email,
-        password: hashedPassword, // Salva o hash, NUNCA a senha pura
-        city
+        password: hashedPassword,       
+        city: "Recife"      
       }
     });
 
-    // Remove a senha do objeto de retorno por segurança
+    
     const { password: _, ...userWithoutPassword } = newUser;
 
-    res.status(201).json({ 
-      message: "Usuário criado com sucesso!",
-      user: userWithoutPassword 
-    });
+    res.status(201).json(userWithoutPassword);
 
   } catch (error) {
     console.error("Erro no registro:", error);
@@ -68,64 +61,51 @@ app.post('/auth/register', async (req, res) => {
   }
 });
 
-// =========================================================
-// ROTA DE LOGIN (Verifica Senha + Gera Token)
-// =========================================================
-app.post('/auth/login', async (req, res) => {
+
+
+app.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ error: "E-mail e senha são obrigatórios." });
+    return res.status(400).json({ error: "Email e senha são obrigatórios." });
   }
 
   try {
-    // 1. Busca usuário pelo email
-    const user = await prisma.user.findUnique({
-      where: { email: email }
-    });
-
+    
+    const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return res.status(400).json({ error: "Credenciais inválidas." });
+      return res.status(401).json({ error: "Credenciais inválidas." });
     }
 
-    // 2. Compara a senha enviada com o Hash do banco
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      return res.status(400).json({ error: "Credenciais inválidas." });
+    
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: "Credenciais inválidas." });
     }
 
-    // 3. Gera o Token JWT
-    // Esse token contém o ID e a Cidade do usuário, e expira em 1 dia
+    // gera JWT
     const token = jwt.sign(
-      { id: user.id, city: user.city }, 
-      JWT_SECRET, 
-      { expiresIn: '1d' }
+      { user_id: user.id, email: user.email }, 
+      process.env.JWT_SECRET || 'segredo_super_secreto', 
+      { expiresIn: '1h' }
     );
 
-    // Retorna token e dados do usuário (úteis para o Front já carregar o clima)
+    
     res.json({
-      message: "Login realizado com sucesso!",
-      token: token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        city: user.city // O Frontend vai usar isso para chamar o WeatherService!
-      }
+      access: token,
+      refresh: "token_refresh_exemplo_se_quiser_implementar", 
+      userId: user.id 
     });
 
   } catch (error) {
     console.error("Erro no login:", error);
-    res.status(500).json({ error: "Erro interno no login." });
+    res.status(500).json({ error: "Erro interno no servidor." });
   }
 });
 
-// =========================================================
-// ROTA DE PERFIL (Exemplo de rota protegida)
-// =========================================================
+// rota para obter os dados do perfil
 app.get('/users/me', async (req, res) => {
-  // Pega o token do cabeçalho "Authorization: Bearer <token>"
+  // Pega o token do cabeçalho 
   const authHeader = req.headers.authorization;
   
   if (!authHeader) {
@@ -148,6 +128,58 @@ app.get('/users/me', async (req, res) => {
 
   } catch (error) {
     return res.status(401).json({ error: "Token inválido ou expirado." });
+  }
+});
+
+// rota para identificar o usuario
+app.get('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
+
+    // Remove a senha antes de enviar pro front
+    const { password, ...userData } = user;
+    res.json(userData);
+
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao buscar perfil" });
+  }
+});
+
+// rota para atualizar o perfil
+app.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, city, password } = req.body;
+
+  try {
+    const dataToUpdate = {
+      name,
+      city
+    };
+
+    // Só atualiza a senha se o usuário digitou algo novo
+    if (password && password.trim() !== "") {
+      const salt = await bcrypt.genSalt(10);
+      dataToUpdate.password = await bcrypt.hash(password, salt);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: parseInt(id) },
+      data: dataToUpdate
+    });
+
+    // Remove senha do retorno
+    const { password: _, ...userClean } = updatedUser;
+    res.json(userClean);
+
+  } catch (error) {
+    console.error("Erro ao atualizar:", error);
+    res.status(500).json({ error: "Erro ao atualizar perfil" });
   }
 });
 

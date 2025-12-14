@@ -10,148 +10,103 @@ const app = express();
 app.use(express.json());
 
 const prisma = new PrismaClient();
+
+// Configuração do Redis 
 const redis = createClient({
   url: process.env.REDIS_URL || 'redis://redis:6379'
 });
 
-await redis.connect();
+redis.on('error', (err) => console.log('Redis Client Error', err));
+
+// Conexão Redis 
+(async () => {
+  await redis.connect();
+  console.log("Conectado ao Redis");
+})();
 
 const API_KEY = process.env.OPENWEATHER_API_KEY;
+const ALERT_SERVICE_URL = process.env.ALERT_SERVICE_URL || 'http://alert-service:3004';
 
-// ------------------------------
-// 1) Clima atual
-// ------------------------------
-app.get("/weather/current/:city", async (req, res) => {
+// Função para checar risco climático
+function checkWeatherRisk(data, city) {
+  
+  const isHighWind = data.wind >= 50; 
+  const isStorm = data.condition.toLowerCase().includes('tempestade') || 
+                  data.condition.toLowerCase().includes('chuva'); 
+
+  if (isHighWind || isStorm) {
+    console.log(`[CLIMA] ⛈️ Perigo detectado em ${city}! Enviando solicitação de alerta...`);    
+    
+    
+    axios.post(`${ALERT_SERVICE_URL}/alerts`, {
+        userId: 1, 
+        city: city,
+        message: `⚠️ ALERTA METEOROLÓGICO em ${city}: ${data.condition}, Ventos de ${data.wind}km/h.`
+    }).catch(e => console.error(`Erro ao contatar AlertService: ${e.message}`));
+  }
+}
+
+// obter informações climáticas por cidade
+app.get("/weather/:city", async (req, res) => { 
   try {
     const { city } = req.params;
-    const cacheKey = `weather:current:${city}`;
+    const cacheKey = `weather:full:${city}`;
 
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      return res.json({ source: "cache", data: JSON.parse(cached) });
+    // le o cache no Redis
+    try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+            console.log(`[CACHE] Clima recuperado do Redis para ${city}`);
+            return res.json({ source: "cache", ...JSON.parse(cached) });
+        }
+    } catch (e) {
+        console.error("Erro ao ler Redis (ignorando):", e.message);
     }
 
+    
+    console.log(`[API] Buscando na OpenWeather para: ${city}`);
     const response = await axios.get(
-      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
+      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric&lang=pt_br`
     );
 
-    const data = {
+    
+    const weatherData = {
+      city: city,
       temp: response.data.main.temp,
+      humidity: response.data.main.humidity,
+      wind: response.data.wind.speed,
       condition: response.data.weather[0].description,
+      updatedAt: new Date()
     };
 
-    await redis.setEx(cacheKey, 600, JSON.stringify(data));
+    // salva no cache do Redis por 10 minutos
+    await redis.setEx(cacheKey, 600, JSON.stringify(weatherData));
 
-    await prisma.weather.create({
-      data: {
-        city,
-        temp: data.temp,
-        condition: data.condition
-      },
-    });
-
-    return res.json({ source: "api", data });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ------------------------------
-// 2) Umidade
-// ------------------------------
-app.get("/weather/humidity/:city", async (req, res) => {
-  try {
-    const { city } = req.params;
-    const cacheKey = `weather:humidity:${city}`;
-
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      return res.json({ source: "cache", data: JSON.parse(cached) });
+    // salva no db
+    try {
+        await prisma.weather.create({
+        data: {
+            city: city,
+            temp: weatherData.temp,
+            condition: weatherData.condition,            
+        },
+        });
+        console.log(`[DB] Clima salvo no Postgres.`);
+    } catch (dbError) {
+        console.error(`[DB ERRO] Tabela Weather não encontrada ou schema inválido: ${dbError.message}`);
     }
+   
+    checkWeatherRisk(weatherData, city);
 
-    const response = await axios.get(
-      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
-    );
+    return res.json({ source: "api", ...weatherData });
 
-    const data = { humidity: response.data.main.humidity };
-
-    await redis.setEx(cacheKey, 600, JSON.stringify(data));
-
-    await prisma.weather.create({
-      data: {
-        city,
-        humidity: data.humidity
-      },
-    });
-
-    return res.json({ source: "api", data });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    console.error("Erro geral:", error.message);    
+    return res.status(500).json({ error: "Erro ao buscar clima" });
   }
 });
 
-// ------------------------------
-// 3) Vento
-// ------------------------------
-app.get("/weather/wind/:city", async (req, res) => {
-  try {
-    const { city } = req.params;
-    const cacheKey = `weather:wind:${city}`;
-
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      return res.json({ source: "cache", data: JSON.parse(cached) });
-    }
-
-    const response = await axios.get(
-      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
-    );
-
-    const data = { speed: response.data.wind.speed };
-
-    await redis.setEx(cacheKey, 600, JSON.stringify(data));
-
-    await prisma.weather.create({
-      data: {
-        city,
-        wind: data.speed
-      },
-    });
-
-    return res.json({ source: "api", data });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ------------------------------
-// 4) Previsão
-// ------------------------------
-app.get("/weather/forecast/:city", async (req, res) => {
-  try {
-    const { city } = req.params;
-    const cacheKey = `weather:forecast:${city}`;
-
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      return res.json({ source: "cache", data: JSON.parse(cached) });
-    }
-
-    const response = await axios.get(
-      `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=metric`
-    );
-
-    const data = response.data.list.slice(0, 5);
-
-    await redis.setEx(cacheKey, 600, JSON.stringify(data));
-
-    return res.json({ source: "api", data });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Weather Service rodando na porta ${PORT} 🚀`);
 });

@@ -14,7 +14,7 @@ services:
       - "5432:5432"
     volumes:
       - main-db-data:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d
+      #- ./init-db:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -99,31 +99,25 @@ services:
       - "3002:3002"
 
   alert-service:
+    # Verifique se o caminho está certo (se é ./src ou ./backend/src)
     build: ./src/AlertService
-    container_name: alert-service
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
     environment:
-      - PORT=3004
-      - RABBITMQ_URL=amqp://rabbitmq:5672
+      # 👇 CORRIGIDO: Senha 123
+      DATABASE_URL: "postgresql://postgres:123@main-db:5432/alertdb?schema=public"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+      PORT: 3004
+    
+    depends_on:
+      main-db:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy # 👇 RabbitMQ fica dentro do depends_on
+    
+    # 👇 CORRIGIDO: ports alinhado à esquerda (fora do depends_on)
     ports:
       - "3004:3004"
 
-  notification-service:
-    build: ./src/NotificationService
-    container_name: notification-service
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      main-db:
-        condition: service_healthy
-    environment:
-      - PORT=3005  
-      - RABBITMQ_URL=amqp://rabbitmq:5672
-      - DATABASE_URL=postgresql://postgres:123@main-db:5432/userdb?schema=public
-    ports:
-      - "3005:3005"
+ 
 
   # --- User Service ---
   user-service:

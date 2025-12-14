@@ -20,11 +20,11 @@ export default function App() {
         {/* Telas principais */}
         <Route path="/login" element={<Login />} />
         <Route path="/cadastro" element={<Cadastro />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/noticias" element={<Noticias />} />
-        <Route path="/clima" element={<Clima />} />
-        <Route path="/alertas" element={<Alertas />} />
-        <Route path="/perfil" element={<Perfil />} />
+        <Route path="/dashboard/:userId" element={<Dashboard />} />
+        <Route path="/noticias/:userId" element={<Noticias />} />
+        <Route path="/clima/:userId" element={<Clima />} />
+        <Route path="/alertas/:userId" element={<Alertas />} />
+        <Route path="/perfil/" element={<Perfil />} />
 
       </Routes>
     </Router>

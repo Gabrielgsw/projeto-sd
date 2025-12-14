@@ -1,24 +1,9 @@
 FROM node:22-alpine
-
-# Instala OpenSSL (Obrigatório para o Prisma rodar no Alpine Linux)
 RUN apk add --no-cache openssl
-
 WORKDIR /app
-
-# Copia os arquivos de definição de dependências
 COPY package*.json ./
-
-# Instala as dependências (incluindo bcryptjs, jsonwebtoken e prisma)
 RUN npm install
-
-# Copia o restante do código fonte (app.js, pasta prisma, etc)
 COPY . .
-
-# Gera o Cliente do Prisma (lê o schema.prisma e cria os arquivos JS necessários)
 RUN npx prisma generate
-
-# Expõe a porta 3003 (Padrão que definimos para o User Service)
 EXPOSE 3003
-
-# Inicia a aplicação
 CMD ["npm", "start"]
